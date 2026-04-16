@@ -1,0 +1,138 @@
+name: Flask DB CI/CD Demo
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+
+  # ---------------- DEV ----------------
+  dev:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: admin
+          POSTGRES_DB: devdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U admin"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Flyway
+        run: |
+          wget -q https://repo1.maven.org/maven2/org/flywaydb/flyway-commandline/9.22.3/flyway-commandline-9.22.3-linux-x64.tar.gz
+          tar -xzf flyway-commandline-9.22.3-linux-x64.tar.gz
+          sudo ln -s $(pwd)/flyway-9.22.3/flyway /usr/local/bin/flyway
+
+      - name: Run DB migrations (DEV)
+        run: |
+          flyway -url=jdbc:postgresql://localhost:5432/devdb \
+                 -user=admin \
+                 -password=admin \
+                 -locations=filesystem:./migrations \
+                 migrate
+
+      - name: Verify DB (DEV)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y postgresql-client
+
+          echo "---- Tables ----"
+          PGPASSWORD=admin psql -h localhost -U admin -d devdb -c "\dt"
+
+          echo "---- Users Table Structure ----"
+          PGPASSWORD=admin psql -h localhost -U admin -d devdb -c "\d users"
+
+          echo "---- Flyway History ----"
+          PGPASSWORD=admin psql -h localhost -U admin -d devdb -c "SELECT version, description FROM flyway_schema_history;"
+
+      - name: Insert & Verify Data (DEV)
+        run: |
+          PGPASSWORD=admin psql -h localhost -U admin -d devdb -c \
+          "INSERT INTO users(name, email) VALUES ('DevUser', 'dev@test.com');"
+
+          PGPASSWORD=admin psql -h localhost -U admin -d devdb -c \
+          "SELECT * FROM users;"
+
+  # ---------------- STAGING ----------------
+  staging:
+    runs-on: ubuntu-latest
+    needs: dev
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: admin
+          POSTGRES_DB: stagingdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U admin"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Flyway
+        run: |
+          wget -q https://repo1.maven.org/maven2/org/flywaydb/flyway-commandline/9.22.3/flyway-commandline-9.22.3-linux-x64.tar.gz
+          tar -xzf flyway-commandline-9.22.3-linux-x64.tar.gz
+          sudo ln -s $(pwd)/flyway-9.22.3/flyway /usr/local/bin/flyway
+
+      - name: Run DB migrations (STAGING)
+        run: |
+          flyway -url=jdbc:postgresql://localhost:5432/stagingdb \
+                 -user=admin \
+                 -password=admin \
+                 -locations=filesystem:./migrations \
+                 migrate
+
+      - name: Verify DB (STAGING)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y postgresql-client
+
+          echo "---- Tables ----"
+          PGPASSWORD=admin psql -h localhost -U admin -d stagingdb -c "\dt"
+
+          echo "---- Users Table Structure ----"
+          PGPASSWORD=admin psql -h localhost -U admin -d stagingdb -c "\d users"
+
+          echo "---- Flyway History ----"
+          PGPASSWORD=admin psql -h localhost -U admin -d stagingdb -c "SELECT version, description FROM flyway_schema_history;"
+
+  # ---------------- PROD ----------------
+  prod:
+    runs-on: ubuntu-latest
+    needs: staging
+    environment: prod   # 👈 optional approval in GitHub
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Simulate PROD deployment
+        run: |
+          echo "Connecting to PROD database..."
+          echo "Running Flyway migrations..."
+
+          # In real scenario:
+          # flyway -url=jdbc:postgresql://PROD_DB_URL \
+          #        -user=PROD_USER \
+          #        -password=PROD_PASS \
+          #        migrate
+
+          echo "PROD deployment completed"
