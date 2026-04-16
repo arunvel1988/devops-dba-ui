@@ -1,0 +1,84 @@
+name: Flask DB CI/CD Demo
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+
+  # ---------------- DEV ----------------
+  dev:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: admin
+          POSTGRES_DB: devdb
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Flyway
+        run: |
+          wget https://repo1.maven.org/maven2/org/flywaydb/flyway-commandline/9.22.3/flyway-commandline-9.22.3-linux-x64.tar.gz
+          tar -xzf flyway-commandline-9.22.3-linux-x64.tar.gz
+          sudo ln -s $(pwd)/flyway-9.22.3/flyway /usr/local/bin/flyway
+
+      - name: Run DB migrations (DEV)
+        run: |
+          sleep 10
+          flyway -url=jdbc:postgresql://localhost:5432/devdb \
+                 -user=admin \
+                 -password=admin \
+                 -locations=filesystem:./migrations \
+                 migrate
+
+  # ---------------- STAGING ----------------
+  staging:
+    runs-on: ubuntu-latest
+    needs: dev
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: admin
+          POSTGRES_DB: stagingdb
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Flyway
+        run: |
+          wget https://repo1.maven.org/maven2/org/flywaydb/flyway-commandline/9.22.3/flyway-commandline-9.22.3-linux-x64.tar.gz
+          tar -xzf flyway-commandline-9.22.3-linux-x64.tar.gz
+          sudo ln -s $(pwd)/flyway-9.22.3/flyway /usr/local/bin/flyway
+
+      - name: Run DB migrations (STAGING)
+        run: |
+          sleep 10
+          flyway -url=jdbc:postgresql://localhost:5432/stagingdb \
+                 -user=admin \
+                 -password=admin \
+                 -locations=filesystem:./migrations \
+                 migrate
+
+  # ---------------- PROD ----------------
+  prod:
+    runs-on: ubuntu-latest
+    needs: staging
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run DB migrations (PROD)
+        run: |
+          echo "In real world → connect to PROD DB here"
