@@ -39,7 +39,7 @@ jobs:
           flyway -url=jdbc:postgresql://localhost:5432/devdb \
                  -user=admin \
                  -password=admin \
-                 -locations=filesystem:./migrations \
+                 -locations=filesystem:./flask-db-demo-01/migrations \
                  migrate
 
       - name: Verify DB (DEV)
@@ -98,7 +98,7 @@ jobs:
           flyway -url=jdbc:postgresql://localhost:5432/stagingdb \
                  -user=admin \
                  -password=admin \
-                 -locations=filesystem:./migrations \
+                 -locations=filesystem:./flask-db-demo-01/migrations \
                  migrate
 
       - name: Verify DB (STAGING)
